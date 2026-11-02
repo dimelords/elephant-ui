@@ -31,6 +31,93 @@ describe('ComboBox', () => {
     })
   })
 
+  describe('fitToViewport', () => {
+    it('caps the popover at the available height and uncaps the list', async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 })
+      render(
+        <ComboBox
+          fitToViewport
+          options={options}
+          selectedOptions={[]}
+          onSelect={() => {}}
+          placeholder='pick'
+        />
+      )
+
+      await user.click(screen.getByRole('button', { name: /pick/ }))
+
+      const list = await screen.findByRole('listbox')
+      expect(list).toHaveClass('max-h-none')
+      expect(list.closest('.max-h-\\(--available-height\\)')).not.toBeNull()
+    })
+
+    it('keeps the list at its 300px cap without it', async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 })
+      render(
+        <ComboBox
+          options={options}
+          selectedOptions={[]}
+          onSelect={() => {}}
+          placeholder='pick'
+        />
+      )
+
+      await user.click(screen.getByRole('button', { name: /pick/ }))
+
+      const list = await screen.findByRole('listbox')
+      expect(list).toHaveClass('max-h-[300px]')
+      expect(list.closest('.max-h-\\(--available-height\\)')).toBeNull()
+    })
+  })
+
+  describe('autoFocus', () => {
+    it('focuses the trigger on mount, leaving the popover closed', () => {
+      render(
+        <ComboBox
+          autoFocus
+          options={options}
+          selectedOptions={[]}
+          onSelect={() => {}}
+          placeholder='pick'
+        />
+      )
+
+      expect(screen.getByRole('button', { name: /pick/ })).toHaveFocus()
+      expect(screen.queryByText('Apple')).not.toBeInTheDocument()
+    })
+
+    // Locks: focus taken on mount is not `:focus-visible` to a browser that
+    // saw the mouse, so the ring `buttonVariants` gives the trigger never
+    // paints and the trigger looks unfocused. Dropping this ring is the bug.
+    it('rings the trigger on plain focus, not only focus-visible', () => {
+      render(
+        <ComboBox
+          autoFocus
+          options={options}
+          selectedOptions={[]}
+          onSelect={() => {}}
+          placeholder='pick'
+        />
+      )
+
+      expect(screen.getByRole('button', { name: /pick/ })).toHaveClass('focus:ring-2')
+    })
+
+    it('takes no focus of its own without it', () => {
+      render(
+        <ComboBox
+          options={options}
+          selectedOptions={[]}
+          onSelect={() => {}}
+          placeholder='pick'
+        />
+      )
+
+      expect(screen.getByRole('button', { name: /pick/ })).not.toHaveFocus()
+      expect(screen.getByRole('button', { name: /pick/ })).not.toHaveClass('focus:ring-2')
+    })
+  })
+
   describe('regression: focus lands on CommandInput after open (#4)', () => {
     // Locks: Base UI's FloatingFocusManager runs on a microtask after mount.
     // ComboBoxList focuses the CommandInput via useEffect + rAF + ref so arrow
@@ -506,6 +593,55 @@ describe('ComboBox', () => {
       expect(handleSelect).toHaveBeenCalledWith(
         expect.objectContaining({ value: 'banana' })
       )
+    })
+
+    it('caps the drawer and uncaps the list with fitToViewport', async () => {
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        writable: true,
+        value: 500
+      })
+
+      const user = userEvent.setup({ pointerEventsCheck: 0 })
+      render(
+        <ComboBox
+          fitToViewport
+          options={options}
+          selectedOptions={[]}
+          onSelect={() => {}}
+          placeholder='pick'
+        />
+      )
+
+      await user.click(screen.getByRole('button', { name: /pick/ }))
+
+      const list = await screen.findByRole('listbox')
+      expect(list).toHaveClass('max-h-none')
+      expect(list.closest('.max-h-\\[calc\\(100dvh-6rem\\)\\]')).not.toBeNull()
+    })
+
+    it('keeps the drawer list at its 300px cap without fitToViewport', async () => {
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        writable: true,
+        value: 500
+      })
+
+      const user = userEvent.setup({ pointerEventsCheck: 0 })
+      render(
+        <ComboBox
+          options={options}
+          selectedOptions={[]}
+          onSelect={() => {}}
+          placeholder='pick'
+        />
+      )
+
+      await user.click(screen.getByRole('button', { name: /pick/ }))
+
+      const list = await screen.findByRole('listbox')
+      expect(list).toHaveClass('max-h-[300px]')
+      expect(list.closest('.max-h-\\[calc\\(100dvh-6rem\\)\\]')).toBeNull()
     })
   })
 })

@@ -22,6 +22,8 @@ interface ComboBoxListProps {
   onSelect: (option: DefaultValueOption) => void
   label?: string
   closeOnSelect?: boolean
+  /** Drops the list's own height cap, leaving it to the popover around it. */
+  fitToViewport?: boolean
   fetchAsyncData?: (s: string) => Promise<void>
   fetchDebounce?: number
   loadingAsync?: boolean
@@ -37,6 +39,7 @@ export function ComboBoxList({
   onSelect,
   label,
   closeOnSelect = false,
+  fitToViewport = false,
   fetchAsyncData,
   fetchDebounce = 400,
   loadingAsync,
@@ -105,7 +108,7 @@ export function ComboBoxList({
         }}
       />
 
-      <CommandList>
+      <CommandList className={fitToViewport ? 'max-h-none' : undefined}>
         <CommandEmpty>{loadingAsync ? <div>{translationStrings?.searching ?? 'Searching...'}</div> : translationStrings?.nothingFound ?? 'Nothing found'}</CommandEmpty>
 
         <CommandGroup>

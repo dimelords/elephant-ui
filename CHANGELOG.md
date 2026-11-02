@@ -1,5 +1,25 @@
 # @ttab/elephant-ui
 
+## 2.1.0
+
+### Minor Changes
+
+- `ComboBox` takes an `autoFocus` prop, which focuses its trigger on mount. It
+  only moves focus to the button: the popover stays closed until the trigger is
+  clicked or Enter/Space is pressed on it, so a form can open on a picker without
+  opening the picker itself. The trigger rings on plain `:focus` while the prop is
+  set, since focus taken on mount is not `:focus-visible` to a browser that saw
+  the mouse open the form.
+
+- `ComboBox` takes a `fitToViewport` prop, which lets its list grow past the
+  300px cap to the room between the trigger and the viewport edge, or on a narrow
+  screen to the height of the drawer. It still scrolls once that room runs out.
+  Meant for short, fixed lists that should show in full.
+
+### Patch Changes
+
+- ComboBox renders a custom trigger on mobile too. The Drawer trigger ignored the children it was given and drew its own label from the selection or placeholder, so a ComboBox with a custom trigger looked right on desktop and wrong on a phone. Both triggers now prefer children where they are given.
+
 ## 2.0.0
 
 ### Major Changes

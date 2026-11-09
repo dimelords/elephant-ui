@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
-import { peerDependencies, dependencies } from './package.json'
+import pkg from './package.json' with { type: 'json' }
 import react from '@vitejs/plugin-react'
 import dts from 'vite-plugin-dts'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
@@ -10,23 +10,26 @@ export default defineConfig({
   plugins: [
     react(),
     dts({
-      include: ['./src/**/*']
+      include: ['./src/**/*'],
+      exclude: ['./src/**/*.test.ts', './src/**/*.test.tsx', './src/test/**']
     }),
     tailwindcss(),
     viteStaticCopy({
       targets: [
         {
           src: './src/styles/index.css',
-          dest: './styles'
+          dest: './styles',
+          rename: { stripBase: true }
         },
         {
           src: './node_modules/@fontsource/inter/files/inter-latin-{300,400,500,600,700,800}-normal.{woff,woff2}',
-          dest: './styles'
+          dest: './styles',
+          rename: { stripBase: true }
         },
         {
           src: 'src/types/lucide-react.d.ts',
           dest: 'components/icons',
-          rename: 'index.d.ts'
+          rename: { stripBase: true, name: 'index.d.ts' }
         }
 
       ]
@@ -34,7 +37,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': resolve(__dirname, './src')
+      '@': resolve(import.meta.dirname, './src')
     },
     dedupe: [
       'react',
@@ -45,18 +48,22 @@ export default defineConfig({
   build: {
     lib: {
       entry: {
-        index: resolve(__dirname, './src/index.ts'),
-        icons: resolve(__dirname, './src/components/icons/index.ts'),
-        utils: resolve(__dirname, './src/lib/utils.ts')
+        index: resolve(import.meta.dirname, './src/index.ts'),
+        icons: resolve(import.meta.dirname, './src/components/icons/index.ts'),
+        utils: resolve(import.meta.dirname, './src/lib/utils.ts')
       },
       formats: ['es', 'cjs'],
       fileName: (format, entryName) => `${entryName}.${format}.js`,
       name: 'ElephantUI'
     },
     rollupOptions: {
-      external: [
-        ...Object.keys(peerDependencies),
-        ...Object.keys(dependencies)],
+      external: (id) => {
+        const externals = [
+          ...Object.keys(pkg.peerDependencies),
+          ...Object.keys(pkg.dependencies)
+        ]
+        return externals.some((name) => id === name || id.startsWith(`${name}/`))
+      },
       output: {
         exports: 'named'
       }

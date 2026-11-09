@@ -1,5 +1,5 @@
 'use client'
-import React, { type Dispatch } from 'react'
+import React, { type Dispatch, useEffect, useRef } from 'react'
 import {
   Command,
   CommandEmpty,
@@ -9,10 +9,10 @@ import {
   CommandList,
   CommandShortcut
 } from '@/components/ui/command'
-import { SquareIcon, SquareCheckIcon } from '@/components/icons'
+import { SquareIcon, SquareCheckIcon } from 'lucide-react'
 import { debounce } from '@/lib/debounce'
 import type { DefaultValueOption } from './comboboxTypes'
-import type { ComboboxTranslations } from 'src/types/translation'
+import type { ComboboxTranslations } from '../../types/translation'
 
 interface ComboBoxListProps {
   options: DefaultValueOption[]
@@ -22,6 +22,8 @@ interface ComboBoxListProps {
   onSelect: (option: DefaultValueOption) => void
   label?: string
   closeOnSelect?: boolean
+  /** Drops the list's own height cap, leaving it to the popover around it. */
+  fitToViewport?: boolean
   fetchAsyncData?: (s: string) => Promise<void>
   fetchDebounce?: number
   loadingAsync?: boolean
@@ -37,17 +39,30 @@ export function ComboBoxList({
   onSelect,
   label,
   closeOnSelect = false,
+  fitToViewport = false,
   fetchAsyncData,
   fetchDebounce = 400,
   loadingAsync,
   minSearchChars = 2,
   translationStrings
 }: ComboBoxListProps): React.JSX.Element {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      inputRef.current?.focus()
+    })
+    return () => cancelAnimationFrame(id)
+  }, [])
+
   const debouncedFetch = debounce(async (input: string) => {
     try {
-      if (fetchAsyncData) {
-        await fetchAsyncData(input)
+      /* v8 ignore start -- defensive: debouncedFetch only invoked when fetchAsyncData is set */
+      if (!fetchAsyncData) {
+        return
       }
+      /* v8 ignore stop */
+      await fetchAsyncData(input)
     } catch (error) {
       console.error('Error fetching data:', error)
     }
@@ -70,11 +85,15 @@ export function ComboBoxList({
       filter={!fetchAsyncData
         ? (_value, search, keywords) => {
             const s = search.toLowerCase()
-            return keywords?.some((kw) => kw.toLowerCase().includes(s)) ? 1 : 0
+            /* v8 ignore next -- defensive: ComboBoxList always sets keywords on items */
+            const matches = keywords?.some((kw) => kw.toLowerCase().includes(s))
+            return matches ? 1 : 0
           }
         : undefined}
     >
       <CommandInput
+        ref={inputRef}
+        autoFocus
         placeholder={label || ''}
         onValueChange={(str: string) => {
           if (fetchAsyncData) {
@@ -89,7 +108,7 @@ export function ComboBoxList({
         }}
       />
 
-      <CommandList>
+      <CommandList className={fitToViewport ? 'max-h-none' : undefined}>
         <CommandEmpty>{loadingAsync ? <div>{translationStrings?.searching ?? 'Searching...'}</div> : translationStrings?.nothingFound ?? 'Nothing found'}</CommandEmpty>
 
         <CommandGroup>
@@ -102,9 +121,12 @@ export function ComboBoxList({
               onMouseUp={handleMouseUp}
               onSelect={(value) => {
                 const newSelectedOption = options.find((option) => option.value === value)
-                if (newSelectedOption) {
-                  onSelect(newSelectedOption)
+                /* v8 ignore start -- defensive: cmdk only fires onSelect with a known value */
+                if (!newSelectedOption) {
+                  return
                 }
+                /* v8 ignore stop */
+                onSelect(newSelectedOption)
                 if (closeOnSelect) {
                   setOpen(false)
                 }

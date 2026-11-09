@@ -7,10 +7,28 @@ import { cn } from '@/lib/utils'
 import { Button } from './button'
 import type { SortableKeys, DefaultValueOption } from './comboboxTypes'
 import { ComboBoxList } from './comboboxList'
-import type { ComboboxTranslations } from 'src/types/translation'
+import type { ComboboxTranslations } from '../../types/translation'
 
 interface ComboBoxBaseProps extends React.PropsWithChildren {
   size?: 'xs' | 'sm' | 'default' | 'lg' | 'icon'
+  /**
+   * Focuses the trigger on mount. It only moves focus to the button - the
+   * popover stays closed until the trigger is clicked or its Enter/Space is
+   * pressed, the same as any other way in.
+   *
+   * The trigger also rings on plain `:focus` while it is set. Focus taken on
+   * mount is not `:focus-visible` to a browser that saw the mouse open the
+   * dialog, so the button's own ring never shows and the form looks like it
+   * has nothing focused - even though Enter opens the popover.
+   */
+  autoFocus?: boolean
+  /**
+   * Lets the list grow to the room between the trigger and the viewport edge
+   * instead of stopping at 300px, or on a narrow screen to the height of the
+   * drawer. Meant for short, fixed lists that should show in full - it still
+   * scrolls once the viewport runs out.
+   */
+  fitToViewport?: boolean
   onOpenChange?: (isOpen: boolean) => void
   placeholder?: string
   validation?: boolean
@@ -43,9 +61,18 @@ interface ComboBoxUncontrolledProps extends ComboBoxBaseProps {
 type ComboBoxProps = ComboBoxControlledProps | ComboBoxUncontrolledProps
 export type { DefaultValueOption }
 
+/**
+ * The ring `buttonVariants` gives a `:focus-visible` trigger, on plain
+ * `:focus` - see `autoFocus`. The tokens are kept the same so an autofocused
+ * trigger looks no different from one the editor tabbed to.
+ */
+const focusRing = 'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2'
+
 export function ComboBox({
   size = 'default',
   variant,
+  autoFocus,
+  fitToViewport = false,
   onOpenChange,
   options,
   placeholder,
@@ -136,48 +163,57 @@ export function ComboBox({
   }
 
   const fetchAsyncData = useCallback(async (query: string) => {
-    if (fetch) {
-      setloadingAsync(true)
-      setOptions(await fetch(query))
-      setloadingAsync(false)
+    /* v8 ignore start -- defensive: callback only passed down when `fetch` is set */
+    if (!fetch) {
+      return
     }
+    /* v8 ignore stop */
+    setloadingAsync(true)
+    setOptions(await fetch(query))
+    setloadingAsync(false)
   }, [fetch])
 
   if (isDesktop) {
     return (
       <Popover open={open} onOpenChange={handleOpenChange} modal={modal}>
-        <PopoverTrigger asChild>
-          <Button
-            size={size}
-            variant={variant || 'outline'}
-            data-ele-placeholder={children || triggerLabel ? undefined : 'true'}
-            data-ele-validation={validation ? 'true' : undefined}
-            className={cn(
-              'w-fit font-sans font-normal whitespace-nowrap p-2',
-              className
-            )}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                setOpen(true)
-                e.stopPropagation()
-              }
-            }}
-          >
-            {children || (triggerLabel
-              ? <span className='truncate'>{triggerLabel}</span>
-              : (
-                  <span
-                    className='text-muted-foreground truncate'
-                    data-ele-placeholder='true'
-                    data-ele-validation={validation ? 'true' : undefined}
-                  >
-                    {placeholder || ''}
-                  </span>
-                ))}
-          </Button>
-        </PopoverTrigger>
+        <PopoverTrigger
+          render={(
+            <Button
+              size={size}
+              autoFocus={autoFocus}
+              variant={variant || 'outline'}
+              data-ele-placeholder={children || triggerLabel ? undefined : 'true'}
+              data-ele-validation={validation ? 'true' : undefined}
+              className={cn(
+                'w-fit font-sans font-normal whitespace-nowrap p-2',
+                autoFocus && focusRing,
+                className
+              )}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.stopPropagation()
+                }
+              }}
+            >
+              {children || (triggerLabel
+                ? <span className='truncate'>{triggerLabel}</span>
+                : (
+                    <span
+                      className='text-muted-foreground truncate'
+                      data-ele-placeholder='true'
+                      data-ele-validation={validation ? 'true' : undefined}
+                    >
+                      {placeholder || ''}
+                    </span>
+                  ))}
+            </Button>
+          )}
+        />
         <PopoverContent
-          className='min-w-[200px] w-fit p-0 max-w-[400px]'
+          className={cn(
+            'min-w-[200px] w-fit p-0 max-w-[400px]',
+            fitToViewport && 'flex flex-col max-h-(--available-height)'
+          )}
           align='start'
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
@@ -193,6 +229,7 @@ export function ComboBox({
             onSelect={(clickedOption) => handleSelect(clickedOption)}
             label={triggerLabel}
             closeOnSelect={closeOnSelect}
+            fitToViewport={fitToViewport}
             fetchAsyncData={fetch
               ? fetchAsyncData
               : undefined}
@@ -212,16 +249,21 @@ export function ComboBox({
       <DrawerTrigger asChild>
         <Button
           variant='outline'
+          autoFocus={autoFocus}
           className={cn(
-            'justify-start px-2 font-sans font-normal whitespace-nowrap text-ellipsis'
+            'justify-start px-2 font-sans font-normal whitespace-nowrap text-ellipsis',
+            autoFocus && focusRing
           )}
         >
-          {triggerLabel ? <>{triggerLabel}</> : <>{placeholder}</>}
+          {children || (triggerLabel ? <>{triggerLabel}</> : <>{placeholder}</>)}
         </Button>
       </DrawerTrigger>
-      <DrawerContent>
+      {/* The drawer has no height cap of its own; held below its `mt-24` so the list scrolls */}
+      <DrawerContent className={cn(fitToViewport && 'max-h-[calc(100dvh-6rem)]')}>
+        {/* TODO: take this label as a prop, or say here why it stays hardcoded */}
+        {/* eslint-disable-next-line i18next/no-literal-string */}
         <DrawerTitle className='sr-only'>Välj alternativ</DrawerTitle>
-        <div className='mt-4 border-t'>
+        <div className={cn('mt-4 border-t', fitToViewport && 'flex min-h-0 flex-col')}>
           <ComboBoxList
             options={_options}
             selectedOptions={selected}
@@ -229,6 +271,7 @@ export function ComboBox({
             onSelect={(clickedOption) => handleSelect(clickedOption)}
             label={triggerLabel}
             closeOnSelect={closeOnSelect}
+            fitToViewport={fitToViewport}
             fetchAsyncData={fetch
               ? fetchAsyncData
               : undefined}
